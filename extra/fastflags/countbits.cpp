@@ -230,6 +230,33 @@ void fastavx2mula(uint16_t *array, size_t len, uint32_t *flags) {
   }
 }
 
+// fixme
+void fastavx2mula2(uint16_t *array, size_t len, uint32_t *flags) {
+  __m256i counters[16];
+
+  for (size_t i = 0; i < 16; i++) {
+    counters[i] = _mm256_setzero_si256();
+  }
+
+  for (size_t i = 0; i + 16 <= len; i += 16) {
+    __m256i input = _mm256_loadu_si256((__m256i *)(array + i));
+
+    for (int j = 0; j < 16; j++) {
+      __m256i bit = _mm256_and_si256(input, _mm256_set1_epi16(1));
+      counters[j] = _mm256_add_epi16(counters[j], bit);
+      input = _mm256_srli_epi16(input, 1);
+    }
+  }
+
+  uint16_t tmp[16];
+  for (size_t i = 0; i < 16; i++) {
+    _mm256_storeu_si256((__m256i*)tmp, counters[i]);
+    flags[i] = 0;
+    for (int j=0; j < 16; j++)
+      flags[i] += tmp[j];
+  }
+}
+
 void demo(size_t len) {
   printf("\n Using array size = %zu \n", len);
   uint32_t counter[16];
@@ -308,6 +335,14 @@ void demo(size_t len) {
   for (size_t i = 0; i < 16; i++) {
     if(counter[i] != truecounter[i]) {
       printf("fastavx2mula is buggy\n");
+      break;
+    }
+  }
+
+  BEST_TIME_NOCHECK(fastavx2mula2(array, len, counter), , repeat, len, true);
+  for (size_t i = 0; i < 16; i++) {
+    if(counter[i] != truecounter[i]) {
+      printf("fastavx2mula2 is buggy\n");
       break;
     }
   }
